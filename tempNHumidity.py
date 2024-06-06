@@ -5,7 +5,6 @@ from adafruit_bus_device.i2c_device import I2CDevice
 
 
 #use $env:BLINKA_FT232H=1 for env
-
 ADDRESS = 0x44
 TOBJ = 0xE0
 
@@ -52,24 +51,22 @@ def humidity(data): #Converting bits 3 and 4 to %RH
   return round(humidity,2)
 
 def runner(): #Returns the temps as a string
-    data = tempNHumidity(outBuff,inBuff)
-    tempData.append(data[0])
-    humidityData.append(data[1])
-    print (data)
+  data = tempNHumidity(outBuff,inBuff)
+  tempData.append(data[0])
+  humidityData.append(data[1])
+  print (data)
 
+if __name__ == '__main__':
+  while(True):
+    df = DataFrame ({"Time (s)" : secDF,"Temperature (c)" : tempData, "Humidity (%RH)" : humidityData})
+    df.to_excel('test.xlsx')
 
+    runner()
 
-
-while(True):
-  df = DataFrame ({"Time (s)" : secDF,"Temperature (c)" : tempData, "Humidity (%RH)" : humidityData})
-  df.to_excel('test.xlsx')
-
-  runner()
-
-  time.sleep(delay)
-  
-  secDF.append(sec)  
-  sec+=delay
+    time.sleep(delay)
+    
+    secDF.append(sec)  
+    sec+=delay
 
 
   
