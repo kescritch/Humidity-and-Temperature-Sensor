@@ -17,22 +17,22 @@ inBuff = bytearray(5) #2 bites for temp, 1 bite checksum, and 2 bites humidity
 check = False
 
 #vars for data frame
-sec = 0
-secDF = []
-tempData = []
-humidityData = []
+sec: int = 0
+secDF: list[int] = []
+tempData: list[float] = []
+humidityData: list[float] = []
 
 #set delay in sec
 delay = .5
 
-def tempNHumidity(outBuff,inBuff): #Getting object temperature 
+def tempNHumidity(outBuff: bytearray,inBuff: bytearray) -> list[float]: #Getting object temperature 
 
   outBuff[0] = (0x24)
   
   i2c_dev.write_then_readinto(outBuff, inBuff, out_end=None)
-  return temp_c(inBuff),humidity(inBuff)
+  return temp_c(inBuff), humidity(inBuff)
 
-def temp_c(data): #Converting bits 0 and 1 to C 
+def temp_c(data: bytearray) -> float: #Converting bits 0 and 1 to C 
   msb = data[0]
   lsb = data[1]
 
@@ -41,7 +41,7 @@ def temp_c(data): #Converting bits 0 and 1 to C
 
   return round(temp,2)
 
-def humidity(data): #Converting bits 3 and 4 to %RH
+def humidity(data: bytearray) -> float: #Converting bits 3 and 4 to %RH
   msb = data[3]
   lsb = data[4]
 
@@ -50,23 +50,36 @@ def humidity(data): #Converting bits 3 and 4 to %RH
 
   return round(humidity,2)
 
-def runner(): #Returns the temps as a string
-  data = tempNHumidity(outBuff,inBuff)
+def append(data: list[float]) -> None: #Returns the temps as a string
   tempData.append(data[0])
   humidityData.append(data[1])
-  print (data)
+  seconds = sec
+  seconds += delay
+  secDF.append(seconds) 
+
+def printer(data: list[float]) -> None: #prints the data 
+  print("Temp (c): \t",data[0])
+  print("Humidity (%RH): ",data[1])
+
+def toExel(data: list[float])-> None: #converts data into excel sheet
+  append(data)
+
+  df = DataFrame ({"Time (s)" : secDF,"Temperature (c)" : tempData, "Humidity (%RH)" : humidityData})
+  df.to_excel('test.xlsx')
+
+def main(): 
+  data = tempNHumidity(outBuff,inBuff)
+  printer(data)
+  toExel(data)
+
+
 
 if __name__ == '__main__':
   while(True):
-    df = DataFrame ({"Time (s)" : secDF,"Temperature (c)" : tempData, "Humidity (%RH)" : humidityData})
-    df.to_excel('test.xlsx')
 
-    runner()
+    main()
 
-    time.sleep(delay)
-    
-    secDF.append(sec)  
-    sec+=delay
+    time.sleep(delay)    
 
 
   
