@@ -1,87 +1,72 @@
+import os
 import time
-from board import *
+
 from pandas import DataFrame
+os.environ["BLINKA_FT232H"] = "1"
+from board import I2C
 from adafruit_bus_device.i2c_device import I2CDevice
 
 
-#use $env:BLINKA_FT232H=1 for env
-ADDRESS = 0x44
-TOBJ = 0xE0
+THRESHOLD = 0.008
+delay = 1
+"""
+address for the 
+"""
+class TemperatureReadout:
+  def __init__(self, address):
+    i2c = I2C()
+    self.dev = I2CDevice(i2c, address)
 
-# creating I2C
-i2c = I2C()
-i2c_dev = I2CDevice(i2c, ADDRESS)
-outBuff = bytearray(2)
-inBuff = bytearray(5) #2 bites for temp, 1 bite checksum, and 2 bites humidity
+  """
+    Gets the temperature and humidity from sensor returns temp and humidity as a tuple. [0] = temp [1] = humidity
+  """
+  def getTemperatureHumidity(self):
+    message = bytearray(2)
+    result = bytearray(5)
+    message[0] = (0x24)
 
-check = False
+    self.dev.write_then_readinto(message, result, out_end=None)
 
-#vars for data frame
-sec: int = 0
-secDF: list[int] = []
-tempData: list[float] = []
-humidityData: list[float] = []
+    return self._temp_c(result), self._humidity(result)
 
-#set delay in sec
-delay = .5
+  """
+  converts the data into c
+  """
+  def _temp_c(self, data: bytearray) -> float: #Converting bits 0 and 1 to C 
+    msb = data[0]
+    lsb = data[1]
 
-def tempNHumidity(outBuff: bytearray,inBuff: bytearray) -> list[float]: #Getting object temperature 
+    value = (msb << 8) | lsb
+    temp = (-45+175*((value)/((2**16)-1)))
 
-  outBuff[0] = (0x24)
-  
-  i2c_dev.write_then_readinto(outBuff, inBuff, out_end=None)
-  return temp_c(inBuff), humidity(inBuff)
+    return round(temp,2)
+  """
+  converts the data %RH
+  """
+  def _humidity(self, data: bytearray) -> float: #Converting bits 3 and 4 to %RH
+    msb = data[3]
+    lsb = data[4]
 
-def temp_c(data: bytearray) -> float: #Converting bits 0 and 1 to C 
-  msb = data[0]
-  lsb = data[1]
+    value = (msb << 8) | lsb
+    humidity = ((value/(2**16-1)) * 100)
 
-  value = (msb << 8) | lsb
-  temp = (-45+175*((value)/((2**16)-1)))
-
-  return round(temp,2)
-
-def humidity(data: bytearray) -> float: #Converting bits 3 and 4 to %RH
-  msb = data[3]
-  lsb = data[4]
-
-  value = (msb << 8) | lsb
-  humidity = ((value/(2**16-1)) * 100)
-
-  return round(humidity,2)
-
-def append(data: list[float]) -> None: #Returns the temps as a string
-  tempData.append(data[0])
-  humidityData.append(data[1])
-  seconds = sec
-  seconds += delay
-  secDF.append(seconds) 
-
-def printer(data: list[float]) -> None: #prints the data 
-  print("Temp (c): \t",data[0])
-  print("Humidity (%RH): ",data[1])
-
-def toExel(data: list[float])-> None: #converts data into excel sheet
-  append(data)
-
-  df = DataFrame ({"Time (s)" : secDF,"Temperature (c)" : tempData, "Humidity (%RH)" : humidityData})
-  df.to_excel('test.xlsx')
+    return round(humidity,2)
 
 def main(): 
-  data = tempNHumidity(outBuff,inBuff)
-  printer(data)
-  toExel(data)
+  try:
+    while(True):
 
+      mcu = TemperatureReadout(0x44)
 
+      temp = mcu.getTemperatureHumidity()[0]
+      humidity = mcu.getTemperatureHumidity()[1]
 
-if __name__ == '__main__':
-  while(True):
+  finally:
+      df = {"Temperature" : temp, "Humidity" : humidity}
+      df = DataFrame(df)
+      df.to_csv("results.csv")
 
-    main()
+      print(f"Temperature: {temp} Humidity: {humidity}")
 
-    time.sleep(delay)    
-
-
-  
-     
-
+if __name__ == "__main__":
+  main()
